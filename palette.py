@@ -1,7 +1,7 @@
 # %%
 
 from build123d import *
-from ocp_vscode import show
+#from ocp_vscode import show
 
 # mixers half width
 well_count = 8
@@ -13,9 +13,9 @@ mixer_count = well_count // wells_per_mixer
 well_width = 10
 well_wall = 1
 well_length = 31
-well_depth = 6
+well_depth = 3
 # the extra high divider which helps the well side slot into the mixer side
-well_divider_depth = 8
+well_divider_depth = 5
 well_divider_extra = well_divider_depth - well_depth
 well_divider_clearance = 0.5
 well_side_skirt = 1
@@ -23,7 +23,7 @@ well_side_thickness = 2
 
 mixer_wall = well_wall
 mixer_width = well_width * wells_per_mixer + mixer_wall * (wells_per_mixer - 1)
-mixer_depth = 5
+mixer_depth = 3
 mixer_divider_depth = mixer_depth - well_divider_extra
 # needs to cover
 mixer_length = well_length + 2 * well_wall
@@ -62,6 +62,12 @@ with BuildPart() as hinge_well_side:
             Circle(hinge_radius)
     extrude(amount=hinge_section_x_length)
 
+    # cut a notch for rubber band
+    with BuildSketch(Plane.YZ) as notch_section:#hinge_well_side.faces().sort_by(Axis.X)[0])) as notch_section:
+        with Locations((0, hinge_radius*2)):
+            Circle(hinge_axel_radius, align=(Align.CENTER, Align.CENTER))
+    extrude(amount=hinge_section_x_length*0.75, taper=5, mode=Mode.SUBTRACT)
+
     with BuildSketch(faces().sort_by(Axis.X)[-1]) as rod_section:
         Circle(hinge_axel_radius)
     extrude(amount=hinge_axel_length,taper=44)
@@ -71,6 +77,7 @@ with BuildPart() as hinge_well_side:
         with Locations((hinge_radius, hinge_radius)):
             Rectangle(2*hinge_radius + hinge_offset + well_side_skirt, hinge_radius, align=Align.MAX)
     extrude(amount=hinge_section_x_length)
+
 
 
 # %%
@@ -86,9 +93,14 @@ with BuildPart() as wells:
             Rectangle(total_y_length, well_side_thickness, align=Align.MAX)
     extrude(amount=total_x_length)
 
-    # wells
+    # get well plane before filleting
     base_surface = wells.faces().sort_by(Axis.Z)[-1]
     base_origin = base_surface.vertices().sort_by(Axis.X).sort_by(Axis.Y)[0]
+
+    # soften corners
+    # fillet(wells.edges().filter_by(Axis.Z), radius=1)
+
+    # layout wells
     with BuildSketch(
         Plane(
             z_dir=base_surface.normal_at(),
@@ -112,7 +124,7 @@ with BuildPart() as wells:
     extrude(amount=well_depth - (mixer_depth - mixer_divider_depth))
 
     inside_edges = wells.edges().filter_by(lambda e: e.is_interior)
-    fillet(inside_edges, radius=0.4)
+    fillet(inside_edges, radius=0.6)
 
     extrude(faces().sort_by(Axis.Z)[-1], amount=(mixer_depth - mixer_divider_depth),taper=5)
     # inside_edges = wells.edges().filter_by(lambda e: e.is_interior)
@@ -183,7 +195,7 @@ with BuildPart() as mixer:
 
     # fillet it a bit
     inside_edges = mixer.edges().filter_by(lambda e: e.is_interior)
-    fillet(inside_edges, radius=0.4)
+    fillet(inside_edges, radius=0.6)
 
     # cut down the dividers to allow wells to fit inside
     base_surface = mixer.faces().sort_by(Axis.Z)[-1]
@@ -208,12 +220,16 @@ with BuildPart() as mixer:
 
 # %%
 
-show(wells, mixer, hinge_mixer_side, hinge_right_well_side, hinge_well_side)
+# show(wells, mixer, hinge_mixer_side, hinge_right_well_side, hinge_well_side)
 
 # %%
 
 assembly = Compound(label="palette", children=[
-        wells.part, mixer.part, hinge_mixer_side.part, hinge_right_well_side, hinge_well_side.part
+        wells.part,
+        mixer.part,
+        hinge_mixer_side.part,
+        hinge_right_well_side,
+        hinge_well_side.part
     ]
 )
 # %% 
